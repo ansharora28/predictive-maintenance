@@ -8,31 +8,38 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-# Step 1: Load your dataset
+# Load the dataset
 @st.cache_data
 def load_data(file_path='predictive_maintenance_dataset.csv'):
     """Load dataset from the specified file path."""
     return pd.read_csv(file_path)
 
 data = load_data()
+data_numeric = data.select_dtypes(include=[np.number])  # Only numeric columns
 
-# Step 2: Preprocess the dataset
-data_numeric = data.select_dtypes(include=[np.number])  # Select only numeric columns for correlation
-
-# Display the dataset information
+# App Title and Basic Project Info
 st.title("🔧 Predictive Maintenance Model")
-st.write("This application allows you to train a model on your predictive maintenance dataset and visualize the results.")
-st.write("### Columns in the dataset:")
-st.write(data_numeric.columns.tolist())
+st.subheader("Monitor equipment health and predict potential failures")
+st.markdown("""
+    This tool leverages a machine learning model to analyze historical data and predict equipment failures. 
+    The goal is to identify failure patterns, helping businesses implement effective preventive measures.
+""")
 
-# Step 3: Train the model
+# Display key dataset information visually
+st.markdown("### Dataset Overview")
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Records", data.shape[0])
+col2.metric("Features", data.shape[1])
+col3.metric("Failure Cases", data['failure'].sum())
+
+# Train the model
 if st.button("Train Model"):
     with st.spinner("Training the model... Please wait."):
         # Prepare features and target
-        X = data_numeric.drop('failure', axis=1)  # Features, drop the target column
+        X = data_numeric.drop('failure', axis=1)  # Drop target column for features
         y = data_numeric['failure']  # Target variable
-        
-        # One-hot encode any categorical variables in the dataset if necessary
+
+        # Encode categorical variables if necessary
         X = pd.get_dummies(X, drop_first=True)
 
         # Split the dataset
@@ -42,16 +49,15 @@ if st.button("Train Model"):
         model = RandomForestClassifier()
         model.fit(X_train, y_train)
 
-        # Save the model
+        # Save the model and store variables in session state
         joblib.dump(model, 'trained_model.joblib')
-
-        # Store the split data and feature names in session state
+        st.session_state.model = model
         st.session_state.X_test = X_test
         st.session_state.y_test = y_test
-        st.session_state.X = X  # Store the feature DataFrame
-        st.session_state.model = model  # Store the trained model
+        st.session_state.X = X  # Store feature data for reference
 
     st.success("Model trained successfully!")
+
 
 # Step 4: Show results after training
 if st.button("📊 Show Results"):
@@ -165,14 +171,14 @@ if 'model' in st.session_state:
             input_data[col] = st.slider(
                 f"{col} (Higher values are more likely to result in failure)",
                 min_value=float(st.session_state.X[col].min()),
-                max_value=float(st.session_state.X[col].max()),
+                max_value=float(st.session_state.X[col].max()/1000),
                 value=float(st.session_state.X[col].max() * 0.9)  # Use 90% of the max value for higher likelihood of failure
             )
         else:
             input_data[col] = st.number_input(
                 f"Enter {col}",
                 min_value=float(st.session_state.X[col].min()),
-                max_value=float(st.session_state.X[col].max()),
+                max_value=float(st.session_state.X[col].max()/1000),
                 value=float(st.session_state.X[col].mean())  # Keep this as the mean for less important features
             )
     
